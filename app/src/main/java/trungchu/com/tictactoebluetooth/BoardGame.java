@@ -28,9 +28,11 @@ import static trungchu.com.tictactoebluetooth.constant.BoardConstant.NUM_ROW;
 public class BoardGame extends View {
 
     private PointF mPivotBoard = new PointF(0, 0);
+    private Point mHighLight = new Point(-1, -1); //vi tri o vua chon
     private Paint mPaintLine;
     private Paint mPaintMineCell;
     private Paint mPaintEnemyCell;
+    private Paint mPaintHighLight;
     private float mBoardWidth;
     private float mBoardHeight;
     private float mCellWidth;
@@ -95,6 +97,9 @@ public class BoardGame extends View {
         mPaintMineCell = paintRedCell;
         mPaintEnemyCell = paintGreenCell;
 
+        mPaintHighLight = new Paint(Paint.ANTI_ALIAS_FLAG);
+        mPaintHighLight.setColor(Color.LTGRAY);
+
         //Setup for scale
         mScaleDetector = new ScaleGestureDetector(getContext(), new ScaleListener());
 
@@ -137,13 +142,6 @@ public class BoardGame extends View {
             float y = e.getY();
             Point point = getCurrentCell(x, y);
             if (myTurn && point != null && board[point.x][point.y] == -1) {
-//                myTurn = false;
-//                if (isServer)
-//                    board[point.x][point.y] = 0;
-//                else {
-//                    board[point.x][point.y] = 1;
-//                }
-//                invalidate();
                 if (sendMessageListener != null) {
                     sendMessageListener.sendMessage(point);
                 }
@@ -210,6 +208,11 @@ public class BoardGame extends View {
         // Calculate object cell padding
         mPaddingCell = mPaddingCell * mScaleFactor;
 
+        if(mHighLight.x != -1 && mHighLight.y != -1){
+            canvas.drawRect(convertColIndxToLeftScaledPixel(mHighLight.x),convertRowIndxToTopScaledPixel(mHighLight.y),
+                    convertRowIndxToTopScaledPixel(mHighLight.x+1),convertColIndxToLeftScaledPixel(mHighLight.y + 1),mPaintHighLight);
+        }
+
         //draw signal's position
         for (int i = 0; i < mRows; i++) {
             float cx = convertRowIndxToTopScaledPixel(i);
@@ -267,16 +270,16 @@ public class BoardGame extends View {
             board[point.x][point.y] = 1;
         else
             board[point.x][point.y] = 0;
-
+        mHighLight = point;
         invalidate();
     }
 
     public void setMinePointToBoard(Point point) {
         if (isServer)
-            board[point.x][point.y] = 1;
-        else
             board[point.x][point.y] = 0;
-
+        else
+            board[point.x][point.y] = 1;
+        mHighLight = point;
         invalidate();
     }
 
@@ -366,6 +369,8 @@ public class BoardGame extends View {
         for (int[] row : board) {
             Arrays.fill(row, -1);
         }
+        mHighLight.x = -1;
+        mHighLight.y = -1;
         invalidate();
     }
 }

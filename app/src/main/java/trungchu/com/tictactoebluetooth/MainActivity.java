@@ -139,8 +139,6 @@ public class MainActivity extends AppCompatActivity {
                     byte[] writeBuf = (byte[]) msg.obj;
                     // construct a string from the buffer
                     String writeMessage = new String(writeBuf);
-//                    mAdapter.notifyDataSetChanged();
-//                    messageList.add(new androidRecyclerView.Message(counter++, writeMessage, "Me"));
                     String[] p = writeMessage.split(",");
                     int x = Integer.parseInt(p[0]);
                     int y = Integer.parseInt(p[1]);
@@ -156,8 +154,6 @@ public class MainActivity extends AppCompatActivity {
                     byte[] readBuf = (byte[]) msg.obj;
                     // construct a string from the valid bytes in the buffer
                     String readMessage = new String(readBuf, 0, msg.arg1);
-//                    mAdapter.notifyDataSetChanged();
-//                    messageList.add(new androidRecyclerView.Message(counter++, readMessage, mConnectedDeviceName));
                     String[] p = readMessage.split(",");
                     int x = Integer.parseInt(p[0]);
                     int y = Integer.parseInt(p[1]);
@@ -226,7 +222,7 @@ public class MainActivity extends AppCompatActivity {
         builder.setNegativeButton("OK", new DialogInterface.OnClickListener() {
             @Override
             public void onClick(DialogInterface dialogInterface, int i) {
-                //nothing, dismiss alert
+                mBoardGame.clearMap();
                 dialogInterface.dismiss();
             }
         });
@@ -236,4 +232,24 @@ public class MainActivity extends AppCompatActivity {
 
     }
 
+    @Override
+    public void onBackPressed() {
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        builder.setMessage("Ban co muon thoat game khong?");
+        builder.setCancelable(false);
+        builder.setPositiveButton("Co", new DialogInterface.OnClickListener() {
+            @Override
+            public void onClick(DialogInterface dialogInterface, int i) {
+                finish();
+            }
+        });
+        builder.setNegativeButton("Khong", new DialogInterface.OnClickListener() {
+            @Override
+            public void onClick(DialogInterface dialogInterface, int i) {
+                dialogInterface.dismiss();
+            }
+        });
+        AlertDialog alertDialog = builder.create();
+        alertDialog.show();
+    }
 }
