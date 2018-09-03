@@ -47,6 +47,8 @@ public class BoardGame extends View {
     public static boolean isServer; //true : server / false: client
     public static boolean myTurn;
     private SendMessageListener sendMessageListener;
+    public int my_score = 0;
+    public int enemy_score = 0;
 
     public BoardGame(Context context) {
         this(context, null, 0);
@@ -208,9 +210,15 @@ public class BoardGame extends View {
         // Calculate object cell padding
         mPaddingCell = mPaddingCell * mScaleFactor;
 
+        //draw cell highlight
         if(mHighLight.x != -1 && mHighLight.y != -1){
-            canvas.drawRect(convertColIndxToLeftScaledPixel(mHighLight.x),convertRowIndxToTopScaledPixel(mHighLight.y),
-                    convertRowIndxToTopScaledPixel(mHighLight.x+1),convertColIndxToLeftScaledPixel(mHighLight.y + 1),mPaintHighLight);
+            float rowPixel = convertColIndxToLeftScaledPixel(mHighLight.y);
+            float colPixel = convertRowIndxToTopScaledPixel(mHighLight.x);
+            canvas.drawRect(colPixel,
+                    rowPixel,
+                    colPixel + cellWidth,
+                    rowPixel + cellHeight,
+                    mPaintHighLight);
         }
 
         //draw signal's position
@@ -373,4 +381,5 @@ public class BoardGame extends View {
         mHighLight.y = -1;
         invalidate();
     }
+
 }

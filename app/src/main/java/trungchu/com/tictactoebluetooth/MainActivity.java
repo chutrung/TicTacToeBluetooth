@@ -7,13 +7,20 @@ import android.bluetooth.BluetoothDevice;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.graphics.Point;
+import android.os.CountDownTimer;
 import android.os.Handler;
 import android.os.Message;
 import android.support.v7.app.AlertDialog;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
+import android.util.Log;
 import android.view.View;
+import android.widget.TextView;
 import android.widget.Toast;
+
+import static trungchu.com.tictactoebluetooth.constant.BoardConstant.COUNT_DOWN_TIME;
+import static trungchu.com.tictactoebluetooth.constant.BoardConstant.DISCOVERABLE_DURATION;
+import static trungchu.com.tictactoebluetooth.constant.BoardConstant.LOG_E;
 
 public class MainActivity extends AppCompatActivity {
     // Message types sent from the BluetoothService Handler
@@ -40,10 +47,19 @@ public class MainActivity extends AppCompatActivity {
     private String mConnectedDeviceName = null;
 
     private BoardGame mBoardGame;
+    private TextView mTvMyScore;
+    private TextView mTvEnemyScore;
+    private TextView mTvEnemyTimer;
+    private TextView mTvMyTimer;
+
+    //Declare timer
+    CountDownTimer cTimer = null;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+
         mBluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
 
         // If the adapter is null, then Bluetooth is not supported
@@ -79,13 +95,22 @@ public class MainActivity extends AppCompatActivity {
         super.onDestroy();
         // Stop the Bluetooth chat services
         if (mChatService != null) mChatService.stop();
+        cancelCountDownTimer();
     }
 
     private void setupBoard() {
+
+        mTvEnemyTimer = findViewById(R.id.enemy_time);
+        mTvMyTimer = findViewById(R.id.my_time);
+
         mBoardGame = findViewById(R.id.boardGame);
         mBoardGame.setSendMessageListener(sendMessageListener);
+
+        mTvMyScore = findViewById(R.id.my_score);
+        mTvEnemyScore = findViewById(R.id.enemy_score);
+        setScoreText();
         // Initialize the BluetoothService to perform bluetooth connections
-        mChatService = new BluetoothService( mHandler);
+        mChatService = new BluetoothService(mHandler);
 
     }
 
@@ -94,11 +119,12 @@ public class MainActivity extends AppCompatActivity {
         startActivityForResult(serverIntent, REQUEST_CONNECT_DEVICE);
     }
 
+    //enable discovery bluetooth
     public void discoverable(View v) {
         if (mBluetoothAdapter.getScanMode() !=
                 BluetoothAdapter.SCAN_MODE_CONNECTABLE_DISCOVERABLE) {
             Intent discoverableIntent = new Intent(BluetoothAdapter.ACTION_REQUEST_DISCOVERABLE);
-            discoverableIntent.putExtra(BluetoothAdapter.EXTRA_DISCOVERABLE_DURATION, 300);
+            discoverableIntent.putExtra(BluetoothAdapter.EXTRA_DISCOVERABLE_DURATION, DISCOVERABLE_DURATION);
             startActivity(discoverableIntent);
         }
     }
@@ -139,30 +165,42 @@ public class MainActivity extends AppCompatActivity {
                     byte[] writeBuf = (byte[]) msg.obj;
                     // construct a string from the buffer
                     String writeMessage = new String(writeBuf);
-                    String[] p = writeMessage.split(",");
-                    int x = Integer.parseInt(p[0]);
-                    int y = Integer.parseInt(p[1]);
-                    Point point = new Point(x, y);
-                    mBoardGame.setMinePointToBoard(point);
+                    Point point = getPointFromMessage(writeMessage);
                     BoardGame.myTurn = false;
-                    if(mBoardGame.checkWin(point)){ //ban thang
-                        showAlertDialog(true);
+                    cancelCountDownTimer();
+                    boolean over = false;
+                    if(! point.equals(-1,-1)){
+                        mBoardGame.setMinePointToBoard(point);
+                        if (mBoardGame.checkWin(point)) { //ban thang
+                            over = true;
+                            mBoardGame.my_score++;
+                            setScoreText();
+                            showAlertDialog(true);
+                        }
                     }
+                    if(!over)
+                        startCountDownTimer();
                     break;
                 }
                 case MESSAGE_READ: {
                     byte[] readBuf = (byte[]) msg.obj;
                     // construct a string from the valid bytes in the buffer
                     String readMessage = new String(readBuf, 0, msg.arg1);
-                    String[] p = readMessage.split(",");
-                    int x = Integer.parseInt(p[0]);
-                    int y = Integer.parseInt(p[1]);
-                    Point point = new Point(x, y);
-                    mBoardGame.setEnemyPointToBoard(point);
+                    Point point = getPointFromMessage(readMessage);
                     BoardGame.myTurn = true;
-                    if(mBoardGame.checkWin(point)){ //doi thu thang
-                        showAlertDialog(false);
+                    cancelCountDownTimer();
+                    boolean over = false;
+                    if(! point.equals(-1,-1)){
+                        mBoardGame.setEnemyPointToBoard(point);
+                        if (mBoardGame.checkWin(point)) { //doi thu thang
+                            over = true;
+                            mBoardGame.enemy_score++;
+                            setScoreText();
+                            showAlertDialog(false);
+                        }
                     }
+                    if(!over)
+                        startCountDownTimer();
                     break;
                 }
                 case MESSAGE_DEVICE_NAME:
@@ -182,7 +220,7 @@ public class MainActivity extends AppCompatActivity {
     private SendMessageListener sendMessageListener = new SendMessageListener() {
         @Override
         public void sendMessage(Point point) {
-            String message = point.x+","+point.y;
+            String message = point.x + "," + point.y;
             // Check that we're actually connected before trying anything
             if (mChatService.getState() != BluetoothService.STATE_CONNECTED) {
                 showToast(getString(R.string.not_connected));
@@ -197,28 +235,21 @@ public class MainActivity extends AppCompatActivity {
         }
     };
 
-    private void showToast(String s){
+    private void showToast(String s) {
         Toast.makeText(this, s, Toast.LENGTH_SHORT).show();
     }
 
-    private void showAlertDialog(boolean youWin){
+    private void showAlertDialog(boolean youWin) {
         String mes;
-        if(youWin){
+        if (youWin) {
             mes = "Ban thang";
-        }
-        else {
+        } else {
             mes = "Ban thua";
         }
         AlertDialog.Builder builder = new AlertDialog.Builder(this);
         builder.setTitle("Tran dau ket thuc");
         builder.setMessage(mes);
         builder.setCancelable(false);
-//        builder.setPositiveButton("Co", new DialogInterface.OnClickListener() {
-//            @Override
-//            public void onClick(DialogInterface dialogInterface, int i) {
-//                Toast.makeText(MainActivity.this, "Co", Toast.LENGTH_SHORT).show();
-//            }
-//        });
         builder.setNegativeButton("OK", new DialogInterface.OnClickListener() {
             @Override
             public void onClick(DialogInterface dialogInterface, int i) {
@@ -252,4 +283,58 @@ public class MainActivity extends AppCompatActivity {
         AlertDialog alertDialog = builder.create();
         alertDialog.show();
     }
+
+    private void initCountDownTimer() {
+        //count down 30 seconds
+        cTimer = new CountDownTimer(COUNT_DOWN_TIME * 1000, 1000) {
+            @Override
+            public void onTick(long l) {
+                //change text
+                if(BoardGame.myTurn){
+                    mTvMyTimer.setText(l/1000+"");
+                }else {
+                    mTvEnemyTimer.setText(l/1000+"");
+                }
+            }
+
+            @Override
+            public void onFinish() {
+                //send message
+                if(BoardGame.myTurn) {
+                    sendMessageListener.sendMessage(new Point(-1, -1));
+                }
+            }
+        };
+    }
+
+    private void startCountDownTimer() {
+        mTvMyTimer.setText(COUNT_DOWN_TIME+"");
+        mTvEnemyTimer.setText(COUNT_DOWN_TIME+"");
+        if(cTimer == null)
+            initCountDownTimer();
+
+        if (cTimer != null) {
+            cTimer.start();
+        }
+    }
+
+    private void cancelCountDownTimer() {
+        if (cTimer != null) {
+            cTimer.cancel();
+        }
+    }
+
+    private void setScoreText() {
+        if (mTvMyScore != null) mTvMyScore.setText(mBoardGame.my_score+"");
+        if (mTvEnemyScore != null) mTvEnemyScore.setText(mBoardGame.enemy_score+"");
+    }
+
+    private Point getPointFromMessage(String mes){
+        String[] p = mes.split(",");
+        LOG_E(mes);
+        int x = Integer.parseInt(p[0]);
+        int y = Integer.parseInt(p[1]);
+        return new Point(x, y);
+    }
+
 }
